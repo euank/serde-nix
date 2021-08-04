@@ -234,11 +234,7 @@ where
     }
 
     #[inline]
-    fn serialize_struct(
-        self,
-        _name: &'static str,
-        len: usize,
-    ) -> Result<Self::SerializeStruct> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.serialize_map(Some(len))
     }
 
@@ -358,7 +354,7 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map { ref mut ser } => key.serialize(MapKeySerializer { ser: *ser}),
+            NixExpr::Map { ref mut ser } => key.serialize(MapKeySerializer { ser: *ser }),
             _ => unreachable!(),
         }
     }
