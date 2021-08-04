@@ -121,9 +121,12 @@ where
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<(), Error> {
-        // Should this be an array or a string?
-        // I think serde expects a string, but I need to trace where this is used
-        panic!("TODO");
+        use serde::ser::SerializeSeq;
+        let mut seq = self.serialize_seq(Some(value.len()))?;
+        for byte in value {
+            seq.serialize_element(byte)?;
+        }
+        seq.end()
     }
 
     fn serialize_unit(self) -> Result<(), Error> {
@@ -214,7 +217,7 @@ where
     }
 
     #[inline]
-    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Error> {
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
         write!(self.writer, "{{ ")?;
         Ok(NixExpr::Map { ser: self })
     }
@@ -222,7 +225,7 @@ where
     #[inline]
     fn serialize_struct(
         self,
-        name: &'static str,
+        _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Error> {
         self.serialize_map(Some(len))
@@ -387,7 +390,7 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map { ref mut ser } => ser::SerializeMap::serialize_entry(self, key, value),
+            NixExpr::Map { .. } => ser::SerializeMap::serialize_entry(self, key, value),
             NixExpr::Number { ref mut ser } => value.serialize(&mut **ser),
             NixExpr::RawValue { .. } => unreachable!(),
         }
@@ -395,7 +398,7 @@ where
 
     fn end(self) -> Result<(), Error> {
         match self {
-            NixExpr::Map { ref ser } => ser::SerializeMap::end(self),
+            NixExpr::Map { .. } => ser::SerializeMap::end(self),
             _ => Ok(()),
         }
     }
@@ -413,7 +416,7 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map { ref mut ser } | NixExpr::Number { ref mut ser } => {
+            NixExpr::Map { .. } | NixExpr::Number { .. } => {
                 ser::SerializeStruct::serialize_field(self, key, value)
             }
             NixExpr::RawValue { .. } => unreachable!(),
@@ -431,11 +434,13 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("nix strings may not contain null bytes")]
     UnencodableNullString,
+    #[error("{0}")]
+    Custom(String),
 }
 
 impl serde::ser::Error for Error {
     fn custom<T: fmt::Display>(msg: T) -> Error {
-        panic!("todo")
+        Error::Custom(format!("{}", msg))
     }
 }
 
