@@ -19,6 +19,6 @@ fn test_object() {
     };
     assert_eq!(
         serde_nix::to_string(&p).unwrap(),
-        r#"{ "name" = "foo"; "age" = 20; }"#.to_string(),
+        r#"{ name = "foo"; age = 20; }"#.to_string(),
     );
 }
