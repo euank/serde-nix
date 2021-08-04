@@ -1,6 +1,7 @@
 use serde_nix::ser::Error;
 
-use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[test]
@@ -9,7 +10,7 @@ fn test_write_bool() {
     assert_eq!(serde_nix::to_string(&false).unwrap(), "false".to_string());
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq, Debug, Default)]
+#[derive(Deserialize, Serialize, Hash, PartialEq, Eq, Debug, Default)]
 struct Person {
     name: String,
     age: i32,
@@ -103,4 +104,37 @@ fn test_arrays() {
         &serde_nix::to_string(&vec!["foo", "bar"]).unwrap(),
         r#"[ "foo" "bar" ]"#,
     );
+}
+
+#[cfg(test)]
+fn round_trip<'de, T>(v: T) -> Result<(), Error>
+where
+    T: Serialize + DeserializeOwned + PartialEq + std::fmt::Debug,
+{
+    let nix_str = serde_nix::to_string(&v)?;
+    // evaluate with the nix interpreter, convert to json, and parse that json. :|
+    let json = std::process::Command::new("nix-instantiate")
+        .args(&["--eval", "--json", "-E", &nix_str])
+        .output()
+        .expect("could not run nix-instantiate");
+
+    let json_str = String::from_utf8(json.stdout).unwrap();
+    let obj: T = serde_json::from_str(&json_str).unwrap();
+
+    assert_eq!(obj, v);
+
+    Ok(())
+}
+
+#[test]
+fn test_round_trip_through_nix() {
+    round_trip(1).unwrap();
+    round_trip(vec![1, 2, 3, 4]).unwrap();
+    round_trip("foo".to_string()).unwrap();
+    round_trip(Person {
+        age: 10,
+        name: "foo".to_string(),
+    })
+    .unwrap();
+    round_trip((1, 2, 3)).unwrap();
 }
