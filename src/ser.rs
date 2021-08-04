@@ -198,6 +198,7 @@ where
 
     #[inline]
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
+        write!(self.writer, "[ ")?;
         Ok(NixExpr::Map { ser: self })
     }
 
@@ -269,7 +270,11 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map { ref mut ser } => value.serialize(&mut **ser),
+            NixExpr::Map { ref mut ser } => {
+                value.serialize(&mut **ser)?;
+                write!(ser.writer, " ")?;
+                Ok(())
+            }
             _ => unreachable!(),
         }
     }

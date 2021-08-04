@@ -96,3 +96,11 @@ fn test_hashmaps() {
         Error::MapKeyMustBeAString.to_string(),
     );
 }
+
+#[test]
+fn test_arrays() {
+    assert_eq!(
+        &serde_nix::to_string(&vec!["foo", "bar"]).unwrap(),
+        r#"[ "foo" "bar" ]"#,
+    );
+}
