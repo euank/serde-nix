@@ -1,8 +1,9 @@
 use std::io;
 use std::fmt;
 use std::string::String;
-use std::io::Write;
+
 use serde::ser::{self, Serialize};
+use thiserror::Error;
 
 #[derive(Debug)]
 pub struct Serializer<W> {
@@ -18,22 +19,27 @@ where
     }
 }
 
-fn escape(s: &str) -> String {
+fn escape(s: &str) -> Result<String, Error> {
     let mut result = String::new();
     result += "\"";
     for c in s.chars() {
-        result += &match c {
-            '\n' => "\n".to_string(),
-            '\t' => "\t".to_string(),
-            '\r' => "\r".to_string(),
-            '"' => "\\\"".to_string(),
-            '$' => "''$".to_string(),
-            c => c.to_string(),
-        };
+        result += &escape_char(&c)?;
     }
 
     result += "\"";
-    result
+    Ok(result)
+}
+
+fn escape_char(c: &char) -> Result<String, Error> {
+    Ok(match c {
+        '\0' => return Err(Error::UnencodableNullString),
+        '\n' => "\n".to_string(),
+        '\t' => "\t".to_string(),
+        '\r' => "\r".to_string(),
+        '"' => "\\\"".to_string(),
+        '$' => "''$".to_string(),
+        c => c.to_string(),
+    })
 }
 
 impl<'a, W> serde::Serializer for &'a mut Serializer<W>
@@ -106,19 +112,18 @@ where
     }
 
     fn serialize_char(self, value: char) -> Result<(), Error> {
-        // TODO: escape
-        write!(self.writer, "{}", value)?;
-        Ok(())
+        self.serialize_str(&value.to_string())
     }
 
     fn serialize_str(self, value: &str) -> Result<(), Error> {
-        write!(self.writer, "{}", escape(value))?;
+        write!(self.writer, "{}", escape(value)?)?;
         Ok(())
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<(), Error> {
-        write!(self.writer, "TODO bytes")?;
-        Ok(())
+        // Should this be an array or a string?
+        // I think serde expects a string, but I need to trace where this is used
+        panic!("TODO");
     }
 
     fn serialize_unit(self) -> Result<(), Error> {
@@ -152,7 +157,12 @@ where
     where
         T: ?Sized + Serialize,
     {
-        panic!("TODO")
+        write!(self.writer, "{{ ")?;
+        self.serialize_str(variant)?;
+        write!(self.writer, " = ")?;
+        value.serialize(&mut *self)?;
+        write!(self.writer, "; }}")?;
+        Ok(())
     }
 
     fn serialize_none(self) -> Result<(), Error> {
@@ -168,7 +178,7 @@ where
     }
 
     #[inline]
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
         Ok(NixExpr::Map {
             ser: self,
         })
@@ -202,6 +212,7 @@ where
 
     #[inline]
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Error> {
+        write!(self.writer, "{{ ")?;
         Ok(NixExpr::Map {
             ser: self,
         })
@@ -345,7 +356,7 @@ where
             NixExpr::Map {ref mut ser} => {
                 write!(ser.writer, " = ")?;
                 value.serialize(&mut **ser)?;
-                write!(ser.writer, ";")?;
+                write!(ser.writer, "; ")?;
                 Ok(())
             },
             _ => unreachable!(),
@@ -415,24 +426,12 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    Io(std::io::Error),
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
-    }
-}
-
-impl serde::ser::StdError for Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("nix strings may not contain null bytes")]
+    UnencodableNullString,
 }
 
 impl serde::ser::Error for Error {
