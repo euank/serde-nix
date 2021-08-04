@@ -13,7 +13,10 @@ struct Person {
 }
 #[test]
 fn test_object() {
-    let p = Person{name: "foo".to_string(), age: 20};
+    let p = Person {
+        name: "foo".to_string(),
+        age: 20,
+    };
     assert_eq!(
         serde_nix::to_string(&p).unwrap(),
         r#"{ "name" = "foo"; "age" = 20; }"#.to_string(),

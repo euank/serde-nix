@@ -1,5 +1,5 @@
-use std::io;
 use std::fmt;
+use std::io;
 use std::string::String;
 
 use serde::ser::{self, Serialize};
@@ -15,7 +15,7 @@ where
     W: io::Write,
 {
     pub fn new(writer: W) -> Self {
-        Serializer{writer}
+        Serializer { writer }
     }
 }
 
@@ -44,14 +44,14 @@ fn escape_char(c: &char) -> Result<String, Error> {
 
 impl<'a, W> serde::Serializer for &'a mut Serializer<W>
 where
-    W: io::Write
+    W: io::Write,
 {
     type Ok = ();
     type Error = Error;
     type SerializeSeq = NixExpr<'a, W>;
     type SerializeTuple = NixExpr<'a, W>;
     type SerializeTupleStruct = NixExpr<'a, W>;
-    type SerializeTupleVariant= NixExpr<'a, W>;
+    type SerializeTupleVariant = NixExpr<'a, W>;
     type SerializeMap = NixExpr<'a, W>;
     type SerializeStruct = NixExpr<'a, W>;
     type SerializeStructVariant = NixExpr<'a, W>;
@@ -136,7 +136,12 @@ where
         Ok(())
     }
 
-    fn serialize_unit_variant(self, _name: &'static str, _idx: u32, variant: &'static str) -> Result<(), Error> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _idx: u32,
+        variant: &'static str,
+    ) -> Result<(), Error> {
         self.serialize_str(variant)
     }
 
@@ -179,9 +184,7 @@ where
 
     #[inline]
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-        Ok(NixExpr::Map {
-            ser: self,
-        })
+        Ok(NixExpr::Map { ser: self })
     }
 
     #[inline]
@@ -213,13 +216,15 @@ where
     #[inline]
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Error> {
         write!(self.writer, "{{ ")?;
-        Ok(NixExpr::Map {
-            ser: self,
-        })
+        Ok(NixExpr::Map { ser: self })
     }
 
     #[inline]
-    fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct, Error> {
+    fn serialize_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Error> {
         self.serialize_map(Some(len))
     }
 
@@ -254,16 +259,14 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map{ref mut ser} => {
-                value.serialize(&mut **ser)
-            }
+            NixExpr::Map { ref mut ser } => value.serialize(&mut **ser),
             _ => unreachable!(),
         }
     }
 
     fn end(self) -> Result<(), Error> {
         match self {
-            NixExpr::Map{ser} => {
+            NixExpr::Map { ser } => {
                 write!(ser.writer, "]")?;
                 Ok(())
             }
@@ -341,9 +344,7 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map {ref mut ser} => {
-                key.serialize(&mut **ser)
-            },
+            NixExpr::Map { ref mut ser } => key.serialize(&mut **ser),
             _ => unreachable!(),
         }
     }
@@ -353,22 +354,22 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map {ref mut ser} => {
+            NixExpr::Map { ref mut ser } => {
                 write!(ser.writer, " = ")?;
                 value.serialize(&mut **ser)?;
                 write!(ser.writer, "; ")?;
                 Ok(())
-            },
+            }
             _ => unreachable!(),
         }
     }
 
     fn end(self) -> Result<(), Error> {
         match self {
-            NixExpr::Map {ser} => {
+            NixExpr::Map { ser } => {
                 write!(ser.writer, "}}")?;
                 Ok(())
-            },
+            }
             _ => unreachable!(),
         }
     }
@@ -386,20 +387,16 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map {ref mut ser} => ser::SerializeMap::serialize_entry(self, key, value),
-            NixExpr::Number { ref mut ser } => {
-                value.serialize(&mut **ser)
-            }
-            NixExpr::RawValue{ .. } => unreachable!(),
+            NixExpr::Map { ref mut ser } => ser::SerializeMap::serialize_entry(self, key, value),
+            NixExpr::Number { ref mut ser } => value.serialize(&mut **ser),
+            NixExpr::RawValue { .. } => unreachable!(),
         }
     }
 
     fn end(self) -> Result<(), Error> {
         match self {
-            NixExpr::Map {ref ser} => {
-                ser::SerializeMap::end(self)
-            },
-            _ => Ok(())
+            NixExpr::Map { ref ser } => ser::SerializeMap::end(self),
+            _ => Ok(()),
         }
     }
 }
@@ -416,8 +413,10 @@ where
         T: ?Sized + Serialize,
     {
         match *self {
-            NixExpr::Map {ref mut ser} | NixExpr::Number { ref mut ser } => ser::SerializeStruct::serialize_field(self, key, value),
-            NixExpr::RawValue{ .. } => unreachable!(),
+            NixExpr::Map { ref mut ser } | NixExpr::Number { ref mut ser } => {
+                ser::SerializeStruct::serialize_field(self, key, value)
+            }
+            NixExpr::RawValue { .. } => unreachable!(),
         }
     }
 
@@ -443,7 +442,7 @@ impl serde::ser::Error for Error {
 pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
 where
     W: io::Write,
-    T: ?Sized + Serialize
+    T: ?Sized + Serialize,
 {
     let mut ser = Serializer::new(writer);
     value.serialize(&mut ser)
@@ -451,7 +450,7 @@ where
 
 pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
-    T: ?Sized + Serialize
+    T: ?Sized + Serialize,
 {
     let mut v = Vec::new();
     to_writer(&mut v, value)?;
