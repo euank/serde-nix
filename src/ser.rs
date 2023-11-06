@@ -24,8 +24,15 @@ where
 fn escape(s: &str) -> Result<String> {
     let mut result = String::new();
     result += "\"";
-    for c in s.chars() {
-        result += &escape_char(&c)?;
+    let mut chars = s.chars().peekable();
+    loop {
+        let c = chars.next();
+        match c {
+            None => break,
+            Some(c) => {
+                result += &escape_char(c, chars.peek())?;
+            }
+        }
     }
 
     result += "\"";
@@ -46,27 +53,24 @@ fn escape_map_key(s: &str) -> Result<String> {
     };
 
     // rules for all characters after the initial one
-    let requires_quoting = |c: char| -> bool {
-        match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '\'' | '-' => false,
-            _ => true,
-        }
-    };
+    let requires_quoting =
+        |c: char| -> bool { !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '\'' | '-') };
     if chars.any(requires_quoting) {
         return escape(s);
     }
     Ok(s.to_string())
 }
 
-fn escape_char(c: &char) -> Result<String> {
-    Ok(match c {
-        '\0' => return Err(Error::UnencodableNullString),
-        '\n' => "\n".to_string(),
-        '\t' => "\t".to_string(),
-        '\r' => "\r".to_string(),
-        '"' => "\\\"".to_string(),
-        '$' => "''$".to_string(),
-        c => c.to_string(),
+fn escape_char(c: char, peek: Option<&char>) -> Result<String> {
+    Ok(match (c, peek) {
+        ('\0', _) => return Err(Error::UnencodableNullString),
+        ('\n', _) => "\\n".to_string(),
+        ('\t', _) => "\\t".to_string(),
+        ('\r', _) => "\\r".to_string(),
+        ('\\', _) => "\\\\".to_string(),
+        ('"', _) => "\\\"".to_string(),
+        ('$', Some('{')) => "''$".to_string(),
+        (c, _) => c.to_string(),
     })
 }
 

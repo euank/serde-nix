@@ -1,8 +1,9 @@
-use serde_nix::ser::Error;
+use std::collections::HashMap;
 
+use quickcheck_macros::quickcheck;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_nix::ser::Error;
 
 #[test]
 fn test_write_bool() {
@@ -65,6 +66,14 @@ fn test_hashmaps() {
         r#"{ a-'_b = 1; }"#.to_string(),
     );
 
+    // newline value
+    let mut m = HashMap::new();
+    m.insert("a", "\n");
+    assert_eq!(
+        "{ a = \"\\n\"; }".to_string(),
+        serde_nix::to_string(&m).unwrap(),
+    );
+
     // char key
     let mut m = HashMap::new();
     m.insert('c', 1);
@@ -76,7 +85,7 @@ fn test_hashmaps() {
     m.insert('$', 1);
     assert_eq!(
         serde_nix::to_string(&m).unwrap(),
-        r#"{ "''$" = 1; }"#.to_string(),
+        r#"{ "$" = 1; }"#.to_string(),
     );
 
     // All invalid keys
@@ -120,6 +129,7 @@ where
     T: Serialize + DeserializeOwned + PartialEq + std::fmt::Debug,
 {
     let nix_str = serde_nix::to_string(&v)?;
+    println!("nix str: {}", nix_str);
     // evaluate with the nix interpreter, convert to json, and parse that json. :|
     let json = std::process::Command::new("nix-instantiate")
         .args(&["--eval", "--json", "-E", &nix_str])
@@ -129,7 +139,7 @@ where
     let json_str = String::from_utf8(json.stdout).unwrap();
     let obj: T = serde_json::from_str(&json_str).unwrap();
 
-    assert_eq!(obj, v);
+    assert_eq!(v, obj);
 
     Ok(())
 }
@@ -145,4 +155,21 @@ fn test_round_trip_through_nix() {
     })
     .unwrap();
     round_trip((1, 2, 3)).unwrap();
+}
+
+#[quickcheck]
+fn quickcheck_hashmap_keys(m: HashMap<String, String>) -> bool {
+    // nix can't do null keys, don't bother
+    if m.keys().chain(m.values()).any(|k| {
+        k.chars().any(|c| match c {
+            // nix doesn't deal with null, form feed, or backspace well
+            '\0' | '\u{c}' | '\u{8}' => true,
+            _ => false,
+        })
+    }) {
+        return true;
+    }
+    println!("Debug: {:?}", m);
+    round_trip(m).unwrap();
+    true
 }
