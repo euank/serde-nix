@@ -25,14 +25,8 @@ fn escape(s: &str) -> Result<String> {
     let mut result = String::new();
     result += "\"";
     let mut chars = s.chars().peekable();
-    loop {
-        let c = chars.next();
-        match c {
-            None => break,
-            Some(c) => {
-                result += &escape_char(c, chars.peek())?;
-            }
-        }
+    while let Some(c) = chars.next() {
+        result += &escape_char(c, chars.peek())?;
     }
 
     result += "\"";
