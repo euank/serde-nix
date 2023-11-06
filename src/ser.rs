@@ -32,13 +32,30 @@ fn escape(s: &str) -> Result<String> {
     Ok(result)
 }
 
-// Escape the given string into a nix map key. Omit quoting for alphanumeric keys.
+// Escape the given string into a nix map key. Omit quoting for keys that don't need it
 fn escape_map_key(s: &str) -> Result<String> {
-    if s.chars().all(char::is_alphanumeric) {
-        Ok(s.to_string())
-    } else {
-        escape(s)
+    // https://github.com/NixOS/nix/blob/1a14ce83811038b05b653df461a944ef0847d14d/doc/manual/src/language/values.md?plain=1#L168
+    let mut chars = s.chars();
+    match chars.next() {
+        // empty string must escape
+        None => return escape(s),
+        Some('a'..='z' | 'A'..='Z' | '_') => {
+            // valid first chars
+        }
+        _ => return escape(s),
+    };
+
+    // rules for all characters after the initial one
+    let requires_quoting = |c: char| -> bool {
+        match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '\'' | '-' => false,
+            _ => true,
+        }
+    };
+    if chars.any(requires_quoting) {
+        return escape(s);
     }
+    Ok(s.to_string())
 }
 
 fn escape_char(c: &char) -> Result<String> {

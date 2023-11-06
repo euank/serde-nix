@@ -57,6 +57,14 @@ fn test_hashmaps() {
         r#"{ "foo.bar''${baz}" = 1; }"#.to_string(),
     );
 
+    // unusual keys that don't need quoting
+    let mut m = HashMap::new();
+    m.insert("a-'_b", 1);
+    assert_eq!(
+        serde_nix::to_string(&m).unwrap(),
+        r#"{ a-'_b = 1; }"#.to_string(),
+    );
+
     // char key
     let mut m = HashMap::new();
     m.insert('c', 1);
