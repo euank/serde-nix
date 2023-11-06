@@ -24,32 +24,47 @@ where
 fn escape(s: &str) -> Result<String> {
     let mut result = String::new();
     result += "\"";
-    for c in s.chars() {
-        result += &escape_char(&c)?;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        result += &escape_char(c, chars.peek())?;
     }
 
     result += "\"";
     Ok(result)
 }
 
-// Escape the given string into a nix map key. Omit quoting for alphanumeric keys.
+// Escape the given string into a nix map key. Omit quoting for keys that don't need it
 fn escape_map_key(s: &str) -> Result<String> {
-    if s.chars().all(char::is_alphanumeric) {
-        Ok(s.to_string())
-    } else {
-        escape(s)
+    // https://github.com/NixOS/nix/blob/1a14ce83811038b05b653df461a944ef0847d14d/doc/manual/src/language/values.md?plain=1#L168
+    let mut chars = s.chars();
+    match chars.next() {
+        // empty string must escape
+        None => return escape(s),
+        Some('a'..='z' | 'A'..='Z' | '_') => {
+            // valid first chars
+        }
+        _ => return escape(s),
+    };
+
+    // rules for all characters after the initial one
+    let requires_quoting =
+        |c: char| -> bool { !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '\'' | '-') };
+    if chars.any(requires_quoting) {
+        return escape(s);
     }
+    Ok(s.to_string())
 }
 
-fn escape_char(c: &char) -> Result<String> {
-    Ok(match c {
-        '\0' => return Err(Error::UnencodableNullString),
-        '\n' => "\n".to_string(),
-        '\t' => "\t".to_string(),
-        '\r' => "\r".to_string(),
-        '"' => "\\\"".to_string(),
-        '$' => "''$".to_string(),
-        c => c.to_string(),
+fn escape_char(c: char, peek: Option<&char>) -> Result<String> {
+    Ok(match (c, peek) {
+        ('\0', _) => return Err(Error::UnencodableNullString),
+        ('\n', _) => "\\n".to_string(),
+        ('\t', _) => "\\t".to_string(),
+        ('\r', _) => "\\r".to_string(),
+        ('\\', _) => "\\\\".to_string(),
+        ('"', _) => "\\\"".to_string(),
+        ('$', Some('{')) => "''$".to_string(),
+        (c, _) => c.to_string(),
     })
 }
 
