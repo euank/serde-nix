@@ -55,7 +55,7 @@ fn test_hashmaps() {
     m.insert("foo.bar${baz}", 1);
     assert_eq!(
         serde_nix::to_string(&m).unwrap(),
-        r#"{ "foo.bar''${baz}" = 1; }"#.to_string(),
+        r#"{ "foo.bar\${baz}" = 1; }"#.to_string(),
     );
 
     // unusual keys that don't need quoting

@@ -63,7 +63,7 @@ fn escape_char(c: char, peek: Option<&char>) -> Result<String> {
         ('\r', _) => "\\r".to_string(),
         ('\\', _) => "\\\\".to_string(),
         ('"', _) => "\\\"".to_string(),
-        ('$', Some('{')) => "''$".to_string(),
+        ('$', Some('{')) => "\\$".to_string(),
         (c, _) => c.to_string(),
     })
 }
