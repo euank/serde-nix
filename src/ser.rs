@@ -35,6 +35,15 @@ fn escape(s: &str) -> Result<String> {
 
 // Escape the given string into a nix map key. Omit quoting for keys that don't need it
 fn escape_map_key(s: &str) -> Result<String> {
+    // keywords can't be map keys
+    // https://github.com/NixOS/nix/blob/master/src/libexpr/lexer.l#L109-L118
+    match s {
+        "if" | "then" | "else" | "assert" | "with" | "let" | "in" | "rec" | "inherit" | "or" => {
+            return escape(s);
+        }
+        _ => {}
+    }
+
     // https://github.com/NixOS/nix/blob/1a14ce83811038b05b653df461a944ef0847d14d/doc/manual/src/language/values.md?plain=1#L168
     let mut chars = s.chars();
     match chars.next() {

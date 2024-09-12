@@ -155,6 +155,20 @@ fn test_round_trip_through_nix() {
     })
     .unwrap();
     round_trip((1, 2, 3)).unwrap();
+
+    round_trip("if".to_string()).unwrap();
+    round_trip(vec!["if".to_string()]).unwrap();
+    let m = {
+        let mut m = HashMap::new();
+        // https://github.com/NixOS/nix/blob/master/src/libexpr/lexer.l#L109-L118
+        for kw in vec![
+            "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit", "or",
+        ] {
+            m.insert(kw.to_string(), kw.to_string());
+        }
+        m
+    };
+    round_trip(m).unwrap();
 }
 
 #[quickcheck]
